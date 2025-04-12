@@ -1,6 +1,7 @@
 package com.example.emaPLayer
 
 import android.Manifest
+import kotlinx.coroutines.delay
 import android.content.pm.PackageManager
 import android.media.MediaPlayer
 import androidx.compose.material.icons.Icons
@@ -39,6 +40,8 @@ class MainActivity : ComponentActivity() {
     private var currentSongTitle by mutableStateOf("")
     private var currentSongPath by mutableStateOf("")
     private var lastSongPath by mutableStateOf("")
+//    private var progress by  mutableFloatStateOf(0f)
+//    private var duration by mutableFloatStateOf(0f)
 
     private lateinit var requestPermissionLauncher: ActivityResultLauncher<String>
 
@@ -82,6 +85,7 @@ class MainActivity : ComponentActivity() {
                         },
                         currentSongTitle = currentSongTitle,
                         isPlaying = isPlaying,
+                        mediaPlayer = mediaPlayer,
                         onPlayPauseClick = { startOrPauseMusic(currentSongPath) }
                     )
                 }
@@ -101,14 +105,12 @@ class MainActivity : ComponentActivity() {
         } else {
             if (isPlaying) {
                 if(path != lastSongPath) {
-                    mediaPlayer?.release()
-                    mediaPlayer = MediaPlayer().apply {
-                        setDataSource(path)
-                        prepare()
-                        start()
-                    }
-                    isPlaying = true
+                    mediaPlayer?.reset()
+                    mediaPlayer?.setDataSource(path)
+                    mediaPlayer?.prepare()
+                    mediaPlayer?.start()
 //                    Toast.makeText(this, "false $path, $lastSongPath", Toast.LENGTH_LONG).show()
+                    isPlaying = true
                     lastSongPath = path
                 }else{
                     mediaPlayer?.pause()
@@ -168,8 +170,12 @@ fun MusicPlayerScreen(
     onSongSelected: (String, String) -> Unit,
     currentSongTitle: String,  // Pass currentSongTitle as a parameter
     isPlaying: Boolean,
+    mediaPlayer : MediaPlayer?,
     onPlayPauseClick: () -> Unit
 ) {
+    var progress by remember { mutableFloatStateOf(0f) }
+    var duration by remember { mutableFloatStateOf(0f) }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -195,7 +201,7 @@ fun MusicPlayerScreen(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onSongSelected(title, path) }
+//                            .clickable { onSongSelected(title, path) }
                             .padding(6.dp)
 
                     )
@@ -214,7 +220,31 @@ fun MusicPlayerScreen(
                 style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold),
                 modifier = Modifier.padding(vertical = 16.dp).fillMaxWidth()
             )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Slider(
+                    value = progress,
+                    onValueChange = { newValue ->
+                        progress = newValue
+                    },
+                    onValueChangeFinished = {
+                        mediaPlayer?.seekTo(progress.toInt())
+                    },
+                    valueRange = 0f..(duration.takeIf { it > 0f } ?: 1f),
+                    modifier = Modifier.fillMaxWidth()
+                )
 
+                // Timer Text
+                Text(
+                    text = "${formatTime(progress.toLong())} / ${formatTime(duration.toLong())}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xffffffff)
+                )
+            }
             // Play/Pause Button
             Button(
                 onClick = onPlayPauseClick,
@@ -230,7 +260,66 @@ fun MusicPlayerScreen(
             }
         }
     }
+    // Periodically update progress
+    LaunchedEffect(isPlaying) {
+        while (isPlaying && mediaPlayer != null) {
+            progress = mediaPlayer.currentPosition.toFloat()
+            duration = mediaPlayer.duration.toFloat()
+            delay(500)
+        }
+    }
 }
+
+@Composable
+fun MusicPlayerProgressBar(
+    mediaPlayer: MediaPlayer?,
+    isPlaying: Boolean
+) {
+    var progress by remember { mutableFloatStateOf(0f) }
+    var duration by remember { mutableFloatStateOf(0f) }
+
+    // Periodically update progress
+    LaunchedEffect(isPlaying) {
+        while (isPlaying && mediaPlayer != null) {
+            progress = mediaPlayer.currentPosition.toFloat()
+            duration = mediaPlayer.duration.toFloat()
+            delay(500)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Slider(
+            value = progress,
+            onValueChange = { newValue ->
+                progress = newValue
+            },
+            onValueChangeFinished = {
+                mediaPlayer?.seekTo(progress.toInt())
+            },
+            valueRange = 0f..(duration.takeIf { it > 0f } ?: 1f),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Timer Text
+        Text(
+            text = "${formatTime(progress.toLong())} / ${formatTime(duration.toLong())}",
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+fun formatTime(milliseconds: Long): String {
+    val totalSeconds = milliseconds / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%02d:%02d".format(minutes, seconds)
+}
+
 
 @Preview(showBackground = true)
 @Composable
@@ -247,6 +336,7 @@ fun MusicPlayerScreenPrevPreview() {
         onSongSelected = { _, _ -> },
         currentSongTitle = "Song A",
         isPlaying = true,
+        mediaPlayer = null,
         onPlayPauseClick = {}
     )
 }
