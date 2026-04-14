@@ -19,6 +19,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -77,7 +78,7 @@ class MainActivity : ComponentActivity() {
                     color = Color(0xff131313)
                 ) {
                     MusicPlayerScreen(
-                        songs = loadSongs(LocalContext.current).sortedBy { it.first.lowercase() },
+                        audioFiles = loadSongs(LocalContext.current).sortedBy { it.first.lowercase() },
                         onSongSelected = { title, path ->
                             currentSongTitle = title
                             currentSongPath = path
@@ -166,7 +167,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MusicPlayerScreen(
-    songs: List<Pair<String, String>>,
+    audioFiles: List<Pair<String, String>>,
     onSongSelected: (String, String) -> Unit,
     currentSongTitle: String,  // Pass currentSongTitle as a parameter
     isPlaying: Boolean,
@@ -175,91 +176,141 @@ fun MusicPlayerScreen(
 ) {
     var progress by remember { mutableFloatStateOf(0f) }
     var duration by remember { mutableFloatStateOf(0f) }
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF131313))) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // header
+            Text(
+                text = "My Library",
+                style = MaterialTheme.typography.headlineMedium,
+                color = Color.White,
+                modifier = Modifier.padding(16.dp).padding(top = 16.dp)
+            )
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xff131313))
-    ) {
-        // Display Song List
-        LazyColumn(modifier = Modifier.weight(1f)) {
-            items(songs) { (title, path) ->
-                Box (
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .clickable { onSongSelected(title, path) }
-                        .padding(horizontal = 8.dp),
-                    contentAlignment = Alignment.CenterStart
-                ){
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color(0xffffffff),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .fillMaxWidth()
-//                            .clickable { onSongSelected(title, path) }
-                            .padding(6.dp)
-
-                    )
+            // song list
+            if (audioFiles.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No Audio Found", color = Color.Gray)
                 }
-                Divider()
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(bottom = 120.dp) // Space for the player
+                ) {
+                    items(audioFiles) { (title, path) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSongSelected(title, path) }
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Icon placeholder
+                            Surface(
+                                shape = MaterialTheme.shapes.small,
+                                color = Color.White.copy(alpha = 0.1f),
+                                modifier = Modifier.size(45.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Audiotrack, // Use this instead
+                                    contentDescription = null,
+                                    tint = if (currentSongTitle == title) Color.Green else Color.White,
+                                    modifier = Modifier.padding(8.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(16.dp))
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (currentSongTitle == title) Color.Green else Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
             }
         }
 
-        // Display the currently playing song title
+        // player panel
         if (currentSongTitle.isNotEmpty()) {
-            Text(
-                text = currentSongTitle,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = Color(0xffffffff),
-                style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold),
-                modifier = Modifier.padding(vertical = 16.dp).fillMaxWidth()
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Surface(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                color = Color(0xFF1E1E1E), // Slightly lighter than background for depth
+                tonalElevation = 8.dp,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
             ) {
-                Slider(
-                    value = progress,
-                    onValueChange = { newValue ->
-                        progress = newValue
-                    },
-                    onValueChangeFinished = {
-                        mediaPlayer?.seekTo(progress.toInt())
-                    },
-                    valueRange = 0f..(duration.takeIf { it > 0f } ?: 1f),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                ) {
+                    // Title and Play Button Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = currentSongTitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = if (isPlaying) "Playing" else "Paused",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+                        }
 
-                // Timer Text
-                Text(
-                    text = "${formatTime(progress.toLong())} / ${formatTime(duration.toLong())}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xffffffff)
-                )
-            }
-            // Play/Pause Button
-            Button(
-                onClick = onPlayPauseClick,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isPlaying) Color.Green else Color.Gray
-                )
-            ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint = Color.White
-                )
+                        // Play/Pause Fab-style button
+                        IconButton(
+                            onClick = onPlayPauseClick,
+                            modifier = Modifier
+                                .background(
+                                    if (isPlaying) Color.Green else Color.Gray,
+                                    shape = androidx.compose.foundation.shape.CircleShape
+                                )
+                                .size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = null,
+                                tint = Color.Black
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Progress Slider
+                    Slider(
+                        value = progress,
+                        onValueChange = { progress = it },
+                        onValueChangeFinished = { mediaPlayer?.seekTo(progress.toInt()) },
+                        valueRange = 0f..(duration.coerceAtLeast(1f)),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.Green,
+                            activeTrackColor = Color.Green,
+                            inactiveTrackColor = Color.Gray.copy(alpha = 0.3f)
+                        )
+                    )
+
+                    // Time Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(formatTime(progress.toLong()), color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+                        Text(formatTime(duration.toLong()), color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             }
         }
     }
+
     // Periodically update progress
     LaunchedEffect(isPlaying) {
         while (isPlaying && mediaPlayer != null) {
@@ -268,6 +319,7 @@ fun MusicPlayerScreen(
             delay(500)
         }
     }
+
 }
 
 @Composable
@@ -332,7 +384,7 @@ fun MusicPlayerScreenPrevPreview() {
     )
 
     MusicPlayerScreen(
-        songs = dummySongs,
+        audioFiles = dummySongs,
         onSongSelected = { _, _ -> },
         currentSongTitle = "Song A",
         isPlaying = true,
